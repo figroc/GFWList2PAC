@@ -67,6 +67,7 @@ def parse_gfwlist(content, user_rule=None):
     gfwlist = content.splitlines(False)
     if user_rule:
         gfwlist.extend(user_rule.splitlines(False))
+    jumps = dict();
     domains = set(builtin_rules)
     for line in gfwlist:
         if line.find('.*') >= 0:
@@ -78,8 +79,12 @@ def parse_gfwlist(content, user_rule=None):
         elif line.startswith('['):
             continue
         elif line.startswith('@'):
-            # ignore white list
-            continue
+            if line.startswith('@@'): # extend white list feature
+                sep = line.find('==')
+                if sep > 0:
+                    jumps[line[2:sep].strip()] = line[sep+2:].strip()
+            else: # ignore white list
+                continue
         elif line.startswith('||'):
             add_domain_to_set(domains, line.lstrip('||'))
         elif line.startswith('|'):
@@ -88,7 +93,7 @@ def parse_gfwlist(content, user_rule=None):
             add_domain_to_set(domains, line.lstrip('.'))
         else:
             add_domain_to_set(domains, line)
-    return domains
+    return (jumps, domains)
 
 def reduce_domains(domains):
     # reduce 'www.google.com' to 'google.com'
@@ -134,13 +139,14 @@ def reduce_domains(domains):
     return new_domains
 
 
-def generate_pac(domains, proxy):
+def generate_pac(jumps, domains, proxy):
     # render the pac file
     proxy_content = pkgutil.get_data('gfwlist2pac', 'resources/proxy.pac')
     domains_dict = {}
     for domain in domains:
         domains_dict[domain] = 1
     proxy_content = proxy_content.replace('__PROXY__', json.dumps(str(proxy)))
+    proxy_content = proxy_content.replace('__JUMPS__', json.dumps(jumps, indent=2))
     proxy_content = proxy_content.replace('__DOMAINS__', json.dumps(domains_dict, indent=2))
     return proxy_content
 
@@ -168,13 +174,12 @@ def main():
             user_rule = urllib2.urlopen(args.user_rule, timeout=10).read()
 
     content = decode_gfwlist(content)
-    domains = parse_gfwlist(content, user_rule)
+    (jumps, domains) = parse_gfwlist(content, user_rule)
     domains = reduce_domains(domains)
-    pac_content = generate_pac(domains, args.proxy)
+    pac_content = generate_pac(jumps, domains, args.proxy)
     with open(args.output, 'w') as f:
         f.write(pac_content)
 
 
 if __name__ == '__main__':
     main()
-
