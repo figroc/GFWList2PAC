@@ -34,4 +34,8 @@ fork from [clowwindy](https://github.com/clowwindy/gfwlist2pac)
 ```
 contect mmgac001[at]gmail.com or comit issues if you have any idea
 ```
+### Custom Rule in USER_RULE
+```
+@@ domain == proxy
+```
 
